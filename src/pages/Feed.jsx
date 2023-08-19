@@ -10,31 +10,52 @@ import {
   storage,
 } from "../appwriteConfig";
 import { Image } from "react-feather";
+import { useAuth } from "../context/AuthContext";
 
 const Feed = () => {
   const [threads, setThreads] = useState([]);
   const [threadBody, setThreadbody] = useState("");
   const [threadImage, setThreadImage] = useState();
   const fileRef = useRef(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     getThreads();
   }, []);
 
   const getThreads = async () => {
-    const res = await databases.listDocuments(
-      DEV_db_id,
-      COLLECTIONS_ID_THREADS,
-      [Query.orderDesc("$createdAt")]
-    );
-    console.log(res);
-    setThreads(res.documents);
+    const following = user?.profile?.following;
+
+    let feedPost = [];
+
+    for (let i = 0; following?.length > i; i++) {
+      let res = await databases.listDocuments(
+        DEV_db_id,
+        COLLECTIONS_ID_THREADS,
+        [
+          Query.orderDesc("$createdAt"),
+          Query.equal("owner_id", following[i]),
+          // Query.limit(1),
+        ]
+      );
+      feedPost = [...feedPost, ...res.documents];
+    }
+
+    let res = await databases.listDocuments(DEV_db_id, COLLECTIONS_ID_THREADS, [
+      Query.orderDesc("$createdAt"),
+      Query.equal("owner_id", user?.$id),
+      // Query.limit(1),
+    ]);
+    feedPost = [...feedPost, ...res.documents];
+
+    setThreads(feedPost);
   };
+
 
   const handleThreadSubmit = async (e) => {
     e.preventDefault();
     const payload = {
-      owner_id: "64c8ce7c4de3d6e12198",
+      owner_id: user?.$id,
       body: threadBody,
       image: threadImage,
       likes: 0,
@@ -70,7 +91,7 @@ const Feed = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-[600px]">
+    <>
       <div className="p-4">
         <form onSubmit={handleThreadSubmit}>
           <textarea
@@ -103,7 +124,7 @@ const Feed = () => {
         threads?.map((thread, idx) => (
           <Thread key={idx} thread={thread} setThreads={setThreads} />
         ))}
-    </div>
+    </>
   );
 };
 
